@@ -139,10 +139,36 @@ def softmax_backward(AL, Y):
 
 def l_model_backward(AL, Y, caches):
     """ The full backward loop. Returns grads dict """
-    Grads = {}
+    grads = {}
+    L = len(caches) 
+    m = AL.shape[1]
+    assert (AL.shape == Y.shape), f"Error: AL shape {AL.shape} is not equal to Y shape {Y.shape}"
     
+    current_cache = caches[L-1]
+    grads["dA" + str(L-1)], grads["dW" + str(L)], grads["db" + str(L)] = linear_activation_backward(Y, current_cache, "softmax")
+    
+    for l in reversed(range(L-1)):
+        current_cache = caches[l]
+        
+        dA_prev_temp, dW_temp, db_temp = linear_activation_backward(grads["dA" + str(l+1)], current_cache, "relu")
+        
+        grads["dA" + str(l)] = dA_prev_temp
+        grads["dW" + str(l + 1)] = dW_temp
+        grads["db" + str(l + 1)] = db_temp
+        
+    return grads
     
 
 def update_parameters(parameters, grads, learning_rate):
     """ Gradient Descent update step """
-    pass
+    L = len(parameters) // 2
+
+    for l in range(L):
+        layer_num = l + 1
+        
+        parameters["W" + str(layer_num)] = parameters["W" + str(layer_num)] - learning_rate * grads["dW" + str(layer_num)]
+        
+        parameters["b" + str(layer_num)] = parameters["b" + str(layer_num)] - learning_rate * grads["db" + str(layer_num)]
+        
+    return parameters
+    
