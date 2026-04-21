@@ -7,12 +7,11 @@ def initialize_parameters(layer_dims):
     """ Returns parameters dict {W1, b1, ... WL, bL} 
         The key of the dict will be a f-string W{l} or b{l}
         b will be initialized to zero"""
-    
     parameters = {}
     L = len(layer_dims)
 
-    for l in range(1,L):
-        parameters[f"W{l}"] = np.random.randn(layer_dims[l],layer_dims[l-1])
+    for l in range(1, L):
+        parameters[f"W{l}"] = np.random.randn(layer_dims[l], layer_dims[l-1]) * np.sqrt(2 / layer_dims[l-1])  # He init
         parameters[f"b{l}"] = np.zeros((layer_dims[l], 1))
 
     return parameters
@@ -52,32 +51,31 @@ def linear_activation_forward(A_prev, W, b, activation):
     else:
         raise ValueError(f"Activation function '{activation}' is not supported! Use 'relu' or 'softmax'.")
     
-    cache = linear_cache | activation_cache
+    cache = (linear_cache, activation_cache)
 
     return A, cache
 
 
 def l_model_forward(X, parameters, use_batchnorm):
-    """ The full forward loop. Returns AL, list_of_caches """
-    L = len(parameters) // 2 # number of layers
+    L = len(parameters) // 2
     curr_A = X
-    all_cache = []
+    all_cache = []  
 
-    for l in range(1,L):
+    for l in range(1, L):
+        curr_A, curr_cache = linear_activation_forward(curr_A, parameters[f'W{l}'], parameters[f'b{l}'], "relu")
         if use_batchnorm:
-            curr_A = apply_batchnorm(curr_A)
-        curr_A,curr_cache = linear_activation_forward(curr_A,parameters[f'W{l}'],parameters[f'b{l}'],"relu")
-        all_cache.append(curr_cache)
-    
-    AL,curr_cache = linear_activation_forward(curr_A,parameters[f'W{L}'],parameters[f'b{L}'],"softmax")
-    all_cache.append(curr_cache)
+            curr_A = apply_batchnorm(curr_A)  
+        all_cache.append(curr_cache)  
+
+    AL, curr_cache = linear_activation_forward(curr_A, parameters[f'W{L}'], parameters[f'b{L}'], "softmax")
+    all_cache.append(curr_cache)  
 
     return AL, all_cache
 
 def compute_cost(AL, Y):
     """ Categorical Cross-Entropy """
     m = Y.shape[1]
-    cost = -(1/m) * np.sum(Y * np.log(AL + 1e-8))
+    cost = (-(1/m)) * np.sum(Y * np.log(AL + 1e-8))
     cost = np.squeeze(cost)
     
     return cost
@@ -96,7 +94,9 @@ def apply_batchnorm(A):
 # ==========================================
 def linear_backward(dZ, cache):
     """ Returns dA_prev, dW, db """
-    A_prev, W, b = cache
+    A_prev = cache['A']
+    W = cache['W']
+    b = cache['b'] 
     m = A_prev.shape[1]
 
     dW = (1 / m) * np.dot(dZ, A_prev.T)
@@ -123,7 +123,7 @@ def linear_activation_backward(dA, cache, activation):
 
 def relu_backward(dA, activation_cache):
     """ Returns dZ """
-    Z = activation_cache 
+    Z = activation_cache["Z"] 
 
     dZ = np.array(dA, copy=True) 
     
@@ -131,17 +131,19 @@ def relu_backward(dA, activation_cache):
     
     return dZ
 
-def softmax_backward(AL, Y):
-    """ Returns dZ """
-    dZ = AL - Y
-    
+def softmax_backward(dA, activation_cache):
+    """
+    Returns dZ
+    """
+    Z = activation_cache["Z"]
+    A, _ = softmax(Z) 
+    dZ = A - dA      
     return dZ
 
 def l_model_backward(AL, Y, caches):
     """ The full backward loop. Returns grads dict """
     grads = {}
     L = len(caches) 
-    m = AL.shape[1]
     assert (AL.shape == Y.shape), f"Error: AL shape {AL.shape} is not equal to Y shape {Y.shape}"
     
     current_cache = caches[L-1]
