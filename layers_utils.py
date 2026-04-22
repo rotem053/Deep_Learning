@@ -11,8 +11,11 @@ def initialize_parameters(layer_dims):
     parameters = {}
     L = len(layer_dims)
 
-    for l in range(1,L):
-        parameters[f"W{l}"] = np.random.randn(layer_dims[l],layer_dims[l-1])
+    for l in range(1, L):
+        # אתחול המשקלים עם randn והכפלה בקבוע למניעת התפוצצות/היעלמות גרדיינטים (He Initialization)
+        parameters[f"W{l}"] = np.random.randn(layer_dims[l], layer_dims[l-1]) * np.sqrt(2 / layer_dims[l-1])
+        
+        # אתחול ה-bias לאפס בעזרת zeros
         parameters[f"b{l}"] = np.zeros((layer_dims[l], 1))
 
     return parameters
@@ -55,21 +58,24 @@ def linear_activation_forward(A_prev, W, b, activation):
     cache = (linear_cache, activation_cache)
     return A, cache
 
-
 def l_model_forward(X, parameters, use_batchnorm):
-    print(f"Debug: parameters keys are: {list(parameters.keys())}")
-    """ The full forward loop. Returns AL, list_of_caches """
     L = len(parameters) // 2 # number of layers
     curr_A = X
     all_cache = []
 
     for l in range(1,L):
+        # 1. קודם מחשבים את השכבה (Linear + ReLU)
+        curr_A, curr_cache = linear_activation_forward(curr_A, parameters[f'W{l}'], parameters[f'b{l}'], "relu")
+        
+        # 2. רק אז מפעילים Batchnorm (אם הדגל דלוק)
         if use_batchnorm:
             curr_A = apply_batchnorm(curr_A)
-        curr_A,curr_cache = linear_activation_forward(curr_A,parameters[f'W{l}'],parameters[f'b{l}'],"relu")
+            
+        # 3. שומרים ב-cache
         all_cache.append(curr_cache)
     
-    AL,curr_cache = linear_activation_forward(curr_A,parameters[f'W{L}'],parameters[f'b{L}'],"softmax")
+    # שכבת הפלט (Softmax)
+    AL, curr_cache = linear_activation_forward(curr_A, parameters[f'W{L}'], parameters[f'b{L}'], "softmax")
     all_cache.append(curr_cache)
 
     return AL, all_cache
