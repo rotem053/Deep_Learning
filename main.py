@@ -15,7 +15,6 @@ def load_and_preprocess_mnist():
     mnist_data = fetch_openml('mnist_784', version=1, as_frame=False, parser='liac-arff')
     X, y = mnist_data["data"], mnist_data["target"]
     
-    # שימוש ב-float32 כדי לחסוך חצי מכמות הזיכרון (מונע ArrayMemoryError)
     X = (X.T / 255.).astype(np.float32)
     
     train_x_full = X[:, :60000]
@@ -23,7 +22,6 @@ def load_and_preprocess_mnist():
     test_x = X[:, 60000:]
     test_y = y[60000:]
    
-    # One-hot encoding חסכוני בזיכרון
     def one_hot(Y):
         Y = Y.astype(int) 
         oh = np.zeros((10, Y.size), dtype=np.float32)
@@ -32,7 +30,6 @@ def load_and_preprocess_mnist():
     
     test_y_oh = one_hot(test_y)
     
-    # פיצול ל-Validation
     m_total = train_x_full.shape[1]
     m_val = int(m_total * 0.2)
     perm = np.random.permutation(m_total)
@@ -52,12 +49,11 @@ def run_experiments():
     # 2. הגדרת הפרמטרים של הרשת [סעיף 4.ב]
     layers_dims = [784, 20, 7, 5, 10]
     learning_rate = 0.009 
-    batch_size = 256  # Batch Size קטן יותר כדי שהמחשב לא ייחנק בסעיף 5
+    batch_size = 256 
     num_iterations = 10000
     
     print("\nStarting Training (Section 5) - WITH Batchnorm...")
     
-    # קריאה לפונקציית האימון - ודאי ששינית ל-True בתוך dnn_model.py
     parameters, costs = l_layer_model(
         train_x, 
         train_y, 
