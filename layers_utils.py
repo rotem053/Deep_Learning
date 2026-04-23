@@ -74,13 +74,36 @@ def l_model_forward(X, parameters, use_batchnorm):
 
     return AL, all_cache
 
-def compute_cost(AL, Y):
-    """ Categorical Cross-Entropy """
-    m = Y.shape[1]
-    cost = (-(1/m)) * np.sum(Y * np.log(AL + 1e-8))
-    cost = np.squeeze(cost)
+# #compute_cost as written before l2 regulariztion
+# def compute_cost(AL, Y):
+#     """ Categorical Cross-Entropy """
+#     m = Y.shape[1]
+#     cost = (-(1/m)) * np.sum(Y * np.log(AL + 1e-8))
+#     cost = np.squeeze(cost)
     
-    return cost
+#     return cost
+
+def compute_cost(AL, Y, parameters = None, lambd=0):
+    """
+    AL -- vector of predictions
+    Y -- true labels
+    parameters -- dictionary containing W1, b1...
+    lambd -- regularization hyperparameter (scalar)
+    """
+    m = Y.shape[1]
+    
+    cross_entropy_cost = -np.mean(np.sum(Y * np.log(AL + 1e-8), axis=0))
+    
+    # 2. L2 Regularization term
+    l2_cost = 0
+    if lambd > 0:
+        L = len(parameters) // 2
+        sum_weights_squared = 0
+        for l in range(1, L + 1):
+            sum_weights_squared += np.sum(np.square(parameters[f"W{l}"]))
+        l2_cost = (lambd / (2 * m)) * sum_weights_squared
+        
+    return cross_entropy_cost + l2_cost
 
 def apply_batchnorm(A):
     mean = np.mean(A, axis=1, keepdims=True)
@@ -94,7 +117,7 @@ def apply_batchnorm(A):
 # ==========================================
 # 2. BACKWARD PROPAGATION 
 # ==========================================
-def linear_backward(dZ, cache):
+def linear_backward(dZ, cache, lambd=0):
     """ Returns dA_prev, dW, db """
     A_prev = cache['A']
     W = cache['W']
@@ -102,6 +125,8 @@ def linear_backward(dZ, cache):
     m = A_prev.shape[1]
 
     dW = (1 / m) * np.dot(dZ, A_prev.T)
+    if lambd > 0:
+        dW = dW + (lambd / m) * W
     
     db = (1 / m) * np.sum(dZ, axis=1, keepdims=True)
     
@@ -109,7 +134,7 @@ def linear_backward(dZ, cache):
 
     return dA_prev, dW, db
 
-def linear_activation_backward(dA, cache, activation,use_batchnorm = False):
+def linear_activation_backward(dA, cache, activation,use_batchnorm = False,lambd=0):
     """ Returns dA_prev, dW, db """
     linear_cache, activation_cache = cache
     
@@ -123,7 +148,7 @@ def linear_activation_backward(dA, cache, activation,use_batchnorm = False):
         Z_original = activation_cache['Z']
         dZ = batchnorm_backward(dZ, Z_original)
 
-    dA_prev, dW, db = linear_backward(dZ, linear_cache)
+    dA_prev, dW, db = linear_backward(dZ, linear_cache,lambd)
     return dA_prev, dW, db
 
 def relu_backward(dA, activation_cache):
@@ -145,19 +170,19 @@ def softmax_backward(dA, activation_cache):
     dZ = AL - dA      
     return dZ
 
-def l_model_backward(AL, Y, caches, use_batchnorm = False):
+def l_model_backward(AL, Y, caches, use_batchnorm = False,lambd=0):
     """ The full backward loop. Returns grads dict """
     grads = {}
     L = len(caches) 
     assert (AL.shape == Y.shape), f"Error: AL shape {AL.shape} is not equal to Y shape {Y.shape}"
 
     current_cache = caches[L-1]
-    grads["dA" + str(L-1)], grads["dW" + str(L)], grads["db" + str(L)] = linear_activation_backward(Y, current_cache, "softmax")
+    grads["dA" + str(L-1)], grads["dW" + str(L)], grads["db" + str(L)] = linear_activation_backward(Y, current_cache, "softmax",lambd)
 
     for l in reversed(range(L-1)):
         current_cache = caches[l]
         
-        dA_prev_temp, dW_temp, db_temp = linear_activation_backward(grads["dA" + str(l+1)], current_cache, "relu",use_batchnorm)
+        dA_prev_temp, dW_temp, db_temp = linear_activation_backward(grads["dA" + str(l+1)], current_cache, "relu",use_batchnorm,lambd)
         
         grads["dA" + str(l)] = dA_prev_temp
         grads["dW" + str(l + 1)] = dW_temp

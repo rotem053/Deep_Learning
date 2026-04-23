@@ -3,7 +3,7 @@ from layers_utils import *
 # ==========================================
 # 3. TRAIN THE NETWORK AND PRODUCE PREDICTIONS
 # ==========================================
-def l_layer_model(X, Y, layers_dims, learning_rate, num_iterations, batch_size, use_batchnorm=False, X_val=None, Y_val=None):
+def l_layer_model(X, Y, layers_dims, learning_rate, num_iterations, batch_size, use_batchnorm=False, X_val=None, Y_val=None, lambd=0):
     np.random.seed(42)
     costs = []
     parameters = initialize_parameters(layers_dims)
@@ -27,8 +27,8 @@ def l_layer_model(X, Y, layers_dims, learning_rate, num_iterations, batch_size, 
             
             # Forward -> Cost -> Backward -> Update
             AL, caches  = l_model_forward(X_batch, parameters, use_batchnorm)
-            cost        = compute_cost(AL, Y_batch)
-            grads       = l_model_backward(AL, Y_batch, caches,use_batchnorm)
+            cost        = compute_cost(AL, Y_batch,lambd)
+            grads       = l_model_backward(AL, Y_batch, caches,use_batchnorm,lambd)
             parameters  = update_parameters(parameters, grads, learning_rate)
             
             iteration += 1
@@ -38,7 +38,7 @@ def l_layer_model(X, Y, layers_dims, learning_rate, num_iterations, batch_size, 
                 train_AL, _ = l_model_forward(X, parameters, use_batchnorm)
                 train_cost  = compute_cost(train_AL, Y)
                 val_AL,  _ = l_model_forward(X_val, parameters, use_batchnorm)
-                val_cost   = compute_cost(val_AL, Y_val)
+                val_cost   = compute_cost(val_AL, Y_val,lambd)
                 costs.append(train_cost)
                 print(f"Iteration {iteration} | Train Cost: {train_cost:.6f} | Val Cost: {val_cost:.6f}")
 
