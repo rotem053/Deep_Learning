@@ -25,7 +25,9 @@ def linear_forward(A, W, b):
 
 def softmax(Z):
     """ Returns A, activation_cache """
-    exp_Z = np.exp(Z)
+    shifted_Z = Z - np.max(Z, axis=0, keepdims=True)
+    
+    exp_Z = np.exp(shifted_Z)
     sum_exp_Z = np.sum(exp_Z, axis=0, keepdims=True)
 
     A = exp_Z / sum_exp_Z
@@ -40,7 +42,7 @@ def relu(Z):
     return A, activation_cache
 
 
-def linear_activation_forward(A_prev, W, b, activation):
+def linear_activation_forward(A_prev, W, b, activation, use_batchnorm = False):
     """ Returns A, cache (combines linear & activation caches) """
     linear_z, linear_cache = linear_forward(A_prev, W, b)
     
@@ -48,6 +50,8 @@ def linear_activation_forward(A_prev, W, b, activation):
         A,activation_cache = softmax(linear_z)
     elif activation == "relu":
         A,activation_cache = relu(linear_z)
+        if use_batchnorm:
+            A = apply_batchnorm(A)
     else:
         raise ValueError(f"Activation function '{activation}' is not supported! Use 'relu' or 'softmax'.")
     
@@ -62,9 +66,7 @@ def l_model_forward(X, parameters, use_batchnorm):
     all_cache = []  
 
     for l in range(1, L):
-        curr_A, curr_cache = linear_activation_forward(curr_A, parameters[f'W{l}'], parameters[f'b{l}'], "relu")
-        if use_batchnorm:
-            curr_A = apply_batchnorm(curr_A)  
+        curr_A, curr_cache = linear_activation_forward(curr_A, parameters[f'W{l}'], parameters[f'b{l}'], "relu",use_batchnorm) 
         all_cache.append(curr_cache)  
 
     AL, curr_cache = linear_activation_forward(curr_A, parameters[f'W{L}'], parameters[f'b{L}'], "softmax")
@@ -107,18 +109,21 @@ def linear_backward(dZ, cache):
 
     return dA_prev, dW, db
 
-def linear_activation_backward(dA, cache, activation):
+def linear_activation_backward(dA, cache, activation,use_batchnorm = False):
     """ Returns dA_prev, dW, db """
     linear_cache, activation_cache = cache
     
     if activation == "relu":
         dZ = relu_backward(dA, activation_cache)
-        dA_prev, dW, db = linear_backward(dZ, linear_cache)
         
     elif activation == "softmax":
         dZ = softmax_backward(dA, activation_cache)
-        dA_prev, dW, db = linear_backward(dZ, linear_cache)
-    
+
+    if use_batchnorm:
+        Z_original = activation_cache['Z']
+        dZ = batchnorm_backward(dZ, Z_original)
+
+    dA_prev, dW, db = linear_backward(dZ, linear_cache)
     return dA_prev, dW, db
 
 def relu_backward(dA, activation_cache):
@@ -136,29 +141,30 @@ def softmax_backward(dA, activation_cache):
     Returns dZ
     """
     Z = activation_cache["Z"]
-    A, _ = softmax(Z) 
-    dZ = A - dA      
+    AL, _ = softmax(Z)  
+    dZ = AL - dA      
     return dZ
 
-def l_model_backward(AL, Y, caches):
+def l_model_backward(AL, Y, caches, use_batchnorm = False):
     """ The full backward loop. Returns grads dict """
     grads = {}
     L = len(caches) 
     assert (AL.shape == Y.shape), f"Error: AL shape {AL.shape} is not equal to Y shape {Y.shape}"
-    
+
     current_cache = caches[L-1]
     grads["dA" + str(L-1)], grads["dW" + str(L)], grads["db" + str(L)] = linear_activation_backward(Y, current_cache, "softmax")
-    
+
     for l in reversed(range(L-1)):
         current_cache = caches[l]
         
-        dA_prev_temp, dW_temp, db_temp = linear_activation_backward(grads["dA" + str(l+1)], current_cache, "relu")
+        dA_prev_temp, dW_temp, db_temp = linear_activation_backward(grads["dA" + str(l+1)], current_cache, "relu",use_batchnorm)
         
         grads["dA" + str(l)] = dA_prev_temp
         grads["dW" + str(l + 1)] = dW_temp
         grads["db" + str(l + 1)] = db_temp
         
     return grads
+
     
 
 def update_parameters(parameters, grads, learning_rate):
@@ -174,3 +180,20 @@ def update_parameters(parameters, grads, learning_rate):
         
     return parameters
     
+def batchnorm_backward(dZ_norm, Z_original):
+    m = dZ_norm.shape[1]
+    epsilon = 1e-8
+    
+    mu = np.mean(Z_original, axis=1, keepdims=True)
+    var = np.var(Z_original, axis=1, keepdims=True)
+    
+    std_inv = 1.0 / np.sqrt(var + epsilon)
+    Z_norm = (Z_original - mu) * std_inv
+    
+    dZ = (1./m) * std_inv * (
+        m * dZ_norm - 
+        np.sum(dZ_norm, axis=1, keepdims=True) - 
+        Z_norm * np.sum(dZ_norm * Z_norm, axis=1, keepdims=True)
+    )
+    
+    return dZ

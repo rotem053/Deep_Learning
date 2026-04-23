@@ -28,26 +28,28 @@ def l_layer_model(X, Y, layers_dims, learning_rate, num_iterations, batch_size, 
             # Forward -> Cost -> Backward -> Update
             AL, caches  = l_model_forward(X_batch, parameters, use_batchnorm)
             cost        = compute_cost(AL, Y_batch)
-            grads       = l_model_backward(AL, Y_batch, caches)
+            grads       = l_model_backward(AL, Y_batch, caches,use_batchnorm)
             parameters  = update_parameters(parameters, grads, learning_rate)
             
             iteration += 1
             
             # Record + check stopping criterion every 100 iterations
             if iteration % 100 == 0:
+                train_AL, _ = l_model_forward(X, parameters, use_batchnorm)
+                train_cost  = compute_cost(train_AL, Y)
                 val_AL,  _ = l_model_forward(X_val, parameters, use_batchnorm)
                 val_cost   = compute_cost(val_AL, Y_val)
-                costs.append(cost)
-                print(f"Iteration {iteration} | Train Cost: {cost:.6f} | Val Cost: {val_cost:.6f}")
-                
+                costs.append(train_cost)
+                print(f"Iteration {iteration} | Train Cost: {train_cost:.6f} | Val Cost: {val_cost:.6f}")
+
                 # Stopping criterion
-                if best_val_cost - val_cost < 1e-4:
+                if val_cost >= best_val_cost - 1e-5:
                     no_improve_count += 1
                 else:
                     no_improve_count  = 0
                     best_val_cost     = val_cost
                 
-                if no_improve_count >= 100:
+                if no_improve_count >= 1:
                     print(f"\n⛔ Early stopping at iteration {iteration} (epoch {epoch})")
                     return parameters, costs
     
@@ -98,12 +100,12 @@ def l_layer_model(X, Y, layers_dims, learning_rate, num_iterations, batch_size, 
 #     return parameters, costs
 
 
-def predict(X, Y, parameters):
+def predict(X, Y, parameters, use_batchnorm=False):
     """
     Returns accuracy (float between 0 and 1)
     """
     # Forward pass (without batchnorm)
-    AL, _ = l_model_forward(X, parameters, use_batchnorm=False)
+    AL, _ = l_model_forward(X, parameters, use_batchnorm)
 
     # Predicted class = index of highest probability for each example
     predictions = np.argmax(AL, axis=0) 
@@ -112,3 +114,4 @@ def predict(X, Y, parameters):
     accuracy = np.mean(predictions == labels)
 
     return accuracy
+
