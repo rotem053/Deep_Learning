@@ -94,7 +94,7 @@ def compute_cost(AL, Y, parameters = None, lambd=0):
     
     cross_entropy_cost = -np.mean(np.sum(Y * np.log(AL + 1e-8), axis=0))
     
-    # 2. L2 Regularization term
+    # 2. L2 Regularization 
     l2_cost = 0
     if lambd > 0:
         L = len(parameters) // 2
