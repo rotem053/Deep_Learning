@@ -300,7 +300,6 @@ def linear_activation_backward(dA, cache, activation):
 def relu_backward(dA, activation_cache):
     """ Returns dZ """
     Z = activation_cache["Z"] 
-
     dZ = np.array(dA, copy=True) 
     
     dZ[Z <= 0] = 0
@@ -554,7 +553,7 @@ def run_experiments():
     layers_dims = list((784, 20, 7, 5, 10))
     learning_rate = 0.009
     num_iterations = 3000
-    batch_size = 64
+    batch_size = 512
     
     # ==========================================
     # ניסוי 1: מודל בסיס
